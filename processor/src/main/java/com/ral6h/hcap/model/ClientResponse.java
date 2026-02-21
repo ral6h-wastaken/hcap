@@ -11,6 +11,6 @@ public record ClientResponse(int status, Map<String, List<String>> headers, Opti
   }
 
   public boolean isError() {
-    return this.status() >= 100 && this.status() < 300;
+    return this.status() >= 400;
   }
 }
