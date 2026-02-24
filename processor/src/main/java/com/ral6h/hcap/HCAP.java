@@ -5,6 +5,7 @@ import com.ral6h.hcap.annotation.Body;
 import com.ral6h.hcap.annotation.Client;
 import com.ral6h.hcap.annotation.Header;
 import com.ral6h.hcap.annotation.PathParam;
+import com.ral6h.hcap.annotation.QueryParam;
 import com.ral6h.hcap.annotation.Request;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -154,6 +155,7 @@ public class HCAP extends AbstractProcessor {
         import java.time.Duration;
         import java.util.List;
         import java.util.Map;
+        import java.util.HashMap;
         import java.util.Optional;
 
         import java.util.stream.Stream;
@@ -309,13 +311,23 @@ public class HCAP extends AbstractProcessor {
 
     String path = getPathResolver(clientMethod, clientAnnotation, requestAnnotation);
 
-    String query = getQueryString(clientMethod.getParameters());
+    QueryComponents queryComponents = getQueryString(clientMethod.getParameters());
     String headersStr = getHeadersString(clientMethod.getParameters());
 
     fpw.print(
         """
             String path = %s;
-            String query = "%s";
+            String query = %s;
+            Map<String, Object> optionalQueryParams = new HashMap<>();
+
+            //optional qp map population
+            %s
+
+            for (final var entry : optionalQueryParams.entrySet()) {
+              if (entry.getValue() != null) {
+                query += "&%%s=%%s".formatted(entry.getKey(), entry.getValue());
+              }
+            }
 
             String[] headers = {%s};
             int readTimeout = %d;
@@ -353,7 +365,7 @@ public class HCAP extends AbstractProcessor {
               return null;
             }
         """
-            .formatted(path, query, headersStr, readTimeout, requestMethodStr));
+            .formatted(path, queryComponents.requiredQpStr(), queryComponents.optionalMapPopulationStr(), headersStr, readTimeout, requestMethodStr));
   }
 
   private String getBodyPublisherStr(ExecutableElement clientMethod) {
@@ -392,9 +404,57 @@ public class HCAP extends AbstractProcessor {
     }
   }
 
-  private String getQueryString(List<? extends VariableElement> parameters) {
+  private QueryComponents getQueryString(List<? extends VariableElement> parameters) {
     // TODO: complete
-    return "ciao=proprio&come=stai";
+    final Function<VariableElement, String> queryNameExtractor =
+        ve -> ve.getAnnotation(QueryParam.class).name();
+    final Function<VariableElement, String> queryArgNameExtractor =
+        ve -> ve.getSimpleName().toString();
+
+    final Map<Boolean, Map<String, String>> queryParamToArgNameByRequired =
+        parameters.stream()
+            .filter(elem -> elem.getAnnotation(QueryParam.class) != null)
+            .map(elem -> (VariableElement) elem)
+            .collect(
+                Collectors.partitioningBy(
+                    ve -> ve.getAnnotation(QueryParam.class).required(),
+                    Collectors.toMap(
+                        queryNameExtractor,
+                        queryArgNameExtractor))); // TODO: add support for multiple params with the
+    // same name -> this should be done by checking that the type is List<String>
+
+    final var queryParamStrJoiner =
+        new StringJoiner(
+            """
+            +"&"+\
+            """);
+
+    for (var requiredParam : queryParamToArgNameByRequired.get(true).entrySet()) {
+      final var paramName = requiredParam.getKey();
+      final var paramArgName = requiredParam.getValue();
+
+      queryParamStrJoiner.add(
+          """
+          "%s=%%s".formatted(Optional.ofNullable(%s).orElseThrow(IllegalArgumentException::new))\
+          """
+              .formatted(paramName, paramArgName));
+    }
+
+    final String required = queryParamStrJoiner.length() > 0 ? queryParamStrJoiner.toString() : "\"\"";
+
+    final var optionalQpSb = new StringBuilder();
+    for (var optionalParam : queryParamToArgNameByRequired.get(false).entrySet()) {
+      final var paramName = optionalParam.getKey();
+      final var paramArgName = optionalParam.getValue();
+
+      optionalQpSb.append(
+        """
+        optionalQueryParams.put("%s", %s);\
+        """.formatted(paramName, paramArgName)
+      );
+    }
+
+    return new QueryComponents(required, optionalQpSb.toString());
   }
 
   private String getHeadersString(List<? extends VariableElement> parameters) {
@@ -410,7 +470,10 @@ public class HCAP extends AbstractProcessor {
             .collect(
                 Collectors.partitioningBy(
                     ve -> ve.getAnnotation(Header.class).required(),
-                    Collectors.toMap(headerNameExtractor, headerArgNameExtractor)));  //TODO: add support for multiple headers with the same name
+                    Collectors.toMap(
+                        headerNameExtractor,
+                        headerArgNameExtractor))); // TODO: add support for multiple headers with
+    // the same name
 
     final var headersStrJoiner = new StringJoiner(",");
 
@@ -422,7 +485,19 @@ public class HCAP extends AbstractProcessor {
           """
           "%s", "%%s".formatted(Optional.ofNullable(%s).orElseThrow(IllegalArgumentException::new))\
           """
-              .formatted(headerName, headerArgName)); }
+              .formatted(headerName, headerArgName));
+    }
+
+    for (var optionalHeader : headersToArgNameByRequired.get(false).entrySet()) {
+      final var headerName = optionalHeader.getKey();
+      final var headerArgName = optionalHeader.getValue();
+
+      headersStrJoiner.add(
+          """
+          "%s", "%%s".formatted(%s)\
+          """
+              .formatted(headerName, headerArgName));
+    }
 
     return headersStrJoiner.toString();
   }
@@ -501,3 +576,8 @@ public class HCAP extends AbstractProcessor {
     return sj.toString();
   }
 }
+
+record QueryComponents(
+  String requiredQpStr,
+  String optionalMapPopulationStr
+) {}
