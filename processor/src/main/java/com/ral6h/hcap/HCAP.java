@@ -438,7 +438,6 @@ public class HCAP extends AbstractProcessor {
   }
 
   private QueryComponents getQueryComponents(List<? extends VariableElement> parameters) {
-    // TODO: complete
     final Function<VariableElement, String> queryNameExtractor =
         ve -> ve.getAnnotation(QueryParam.class).name();
     final Function<VariableElement, String> queryArgNameExtractor =
@@ -511,9 +510,6 @@ public class HCAP extends AbstractProcessor {
 
     final var requiredSb = new StringBuilder();
     final var optionalSb = new StringBuilder();
-
-    // Map<String, Object> requiredHeadersMap = new HashMap<>();
-    // Map<String, Object> optionalHeadersMap = new HashMap<>();
 
     for (var requiredHeader : headersToArgNameByRequired.get(true).entrySet()) {
       final var headerName = requiredHeader.getKey();
