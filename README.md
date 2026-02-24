@@ -203,8 +203,6 @@ ClientResponse getOrderItem(
 
 Declares a method parameter as an HTTP query parameter to be appended to the request URL.
 
-> ⚠️ **Note:** Query parameter support is currently a stub — the processor has a `TODO` comment and does not yet generate functional query string logic. The generated code always uses a hardcoded placeholder string `ciao=proprio&come=stai`.
-
 | Attribute | Type | Default | Description |
 |---|---|---|---|
 | `name` | `String` | *(required)* | The query parameter key name. |
@@ -217,12 +215,12 @@ Declares a method parameter as an HTTP query parameter to be appended to the req
 **Target:** Method parameter  
 **Retention:** `SOURCE`
 
-Binds a method parameter to an HTTP request header. Only **required** headers are currently emitted into the generated code.
+Binds a method parameter to an HTTP request header.
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
 | `name` | `String` | *(required)* | The HTTP header name (e.g. `"Authorization"`, `"Content-Type"`). |
-| `required` | `boolean` | `true` | If `true`, the header value is validated as non-null at call time; an `IllegalArgumentException` is thrown if it is null. Optional headers (i.e. `required = false`) are currently not emitted into the generated code. |
+| `required` | `boolean` | `true` | If `true`, the header value is validated as non-null at call time; an `IllegalArgumentException` is thrown if it is null.
 
 **Example:**
 ```java
@@ -279,7 +277,7 @@ public record ClientResponse(
 **Convenience method:**
 
 ```java
-boolean isError()  // Returns true if status is in the 100–299 range (note: this includes informational/success, not just errors — see Known Limitations)
+boolean isError()  // Returns true if status is in the 400–599 range
 ```
 
 **On transport errors**, the generated client returns a synthetic `ClientResponse(500, Map.of(), Optional.empty())` rather than throwing. On `InterruptedException`, the thread's interrupt flag is restored and `null` is returned.
@@ -329,8 +327,43 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
     @Override
     public ClientResponse greet(String name) {
         String path  = "/api/hello/%s".formatted(name);
-        String query = "ciao=proprio&come=stai"; // placeholder — see Known Limitations
-        String[] headers = {};
+        String query = "";
+        Map<String, Object> optionalQueryParams = new HashMap<>();
+
+        //optional qp map population
+
+        for (final var entry : optionalQueryParams.entrySet()) {
+          if (entry.getValue() != null) {
+            query += "&%s=%s".formatted(entry.getKey(), entry.getValue());
+          }
+        }
+
+        List<String> headersList = new ArrayList<>();
+        Map<String, Object> requiredHeadersMap = new HashMap<>();
+        Map<String, Object> optionalHeadersMap = new HashMap<>();
+
+        //required headers map population
+        
+        //optional headers map population
+        
+
+        for (final var requiredHeader : requiredHeadersMap.entrySet()) {
+          headersList.add(requiredHeader.getKey());
+          headersList.add(
+            Optional.ofNullable(requiredHeader.getValue())
+              .map(Object::toString)
+              .orElseThrow(IllegalArgumentException::new)
+          );
+        }
+
+        for (final var optionalHeader : optionalHeadersMap.entrySet()) {
+          if (optionalHeader.getValue() != null) {
+            headersList.add(optionalHeader.getKey());
+            headersList.add(optionalHeader.getValue().toString());
+          }
+        }
+
+        String[] headers = headersList.toArray(new String[] {});
         int readTimeout = 5;
 
         URI uri;
@@ -388,10 +421,9 @@ The processor enforces the following rules at **compile time** and emits a compi
 
 The following features are documented in the source as incomplete or not yet implemented:
 
-- **`@QueryParam` is a stub.** The `getQueryString()` method always returns `"ciao=proprio&come=stai"` regardless of the annotated parameters. Real query string building is marked as `// TODO: complete`.
-- **Optional headers are not emitted.** `@Header(required = false)` parameters are parsed but not included in the generated `headers[]` array.
 - **`@Body.contentType` is not used to set a header.** The content type declared on `@Body` is informational and does not automatically generate a `Content-Type` header.
 - **`@Client.async` is unsupported.** Setting `async = true` will cause a compilation failure. Async support is planned for a future version.
+- **Duplicate query params names.** Setting two query params with the same name will cause compilation to fail (noted as `// TODO: add support for multiple query params with the same name`).
 - **Duplicate header names.** Setting two headers with the same name will cause compilation to fail (noted as `// TODO: add support for multiple headers with the same name`).
 - **HTTP/1.1 only.** The generated client always uses `Version.HTTP_1_1`.
 - **Blocking I/O only.** All requests are sent synchronously via `HttpClient.send(...)`.
