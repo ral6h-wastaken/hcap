@@ -154,6 +154,7 @@ public class HCAP extends AbstractProcessor {
         import java.net.http.HttpResponse.BodyHandlers;
         import java.time.Duration;
         import java.util.List;
+        import java.util.ArrayList;
         import java.util.Map;
         import java.util.HashMap;
         import java.util.Optional;
@@ -311,8 +312,8 @@ public class HCAP extends AbstractProcessor {
 
     String path = getPathResolver(clientMethod, clientAnnotation, requestAnnotation);
 
-    QueryComponents queryComponents = getQueryString(clientMethod.getParameters());
-    String headersStr = getHeadersString(clientMethod.getParameters());
+    QueryComponents queryComponents = getQueryComponents(clientMethod.getParameters());
+    HeaderComponents headerComponents = getHeaderComponents(clientMethod.getParameters());
 
     fpw.print(
         """
@@ -329,7 +330,32 @@ public class HCAP extends AbstractProcessor {
               }
             }
 
-            String[] headers = {%s};
+            List<String> headersList = new ArrayList<>();
+            Map<String, Object> requiredHeadersMap = new HashMap<>();
+            Map<String, Object> optionalHeadersMap = new HashMap<>();
+
+            //required headers map population
+            %s
+            //optional headers map population
+            %s
+
+            for (final var requiredHeader : requiredHeadersMap.entrySet()) {
+              headersList.add(requiredHeader.getKey());
+              headersList.add(
+                Optional.ofNullable(requiredHeader.getValue())
+                  .map(Object::toString)
+                  .orElseThrow(IllegalArgumentException::new)
+              );
+            }
+
+            for (final var optionalHeader : optionalHeadersMap.entrySet()) {
+              if (optionalHeader.getValue() != null) {
+                headersList.add(optionalHeader.getKey());
+                headersList.add(optionalHeader.getValue().toString());
+              }
+            }
+
+            String[] headers = headersList.toArray(new String[] {});
             int readTimeout = %d;
 
             URI uri;
@@ -365,7 +391,14 @@ public class HCAP extends AbstractProcessor {
               return null;
             }
         """
-            .formatted(path, queryComponents.requiredQpStr(), queryComponents.optionalMapPopulationStr(), headersStr, readTimeout, requestMethodStr));
+            .formatted(
+                path,
+                queryComponents.requiredQpStr(),
+                queryComponents.optionalQpMapPopulationStr(),
+                headerComponents.requiredHeadersMapPopulationStr(),
+                headerComponents.optionalHeadersMapPopulationStr(),
+                readTimeout,
+                requestMethodStr));
   }
 
   private String getBodyPublisherStr(ExecutableElement clientMethod) {
@@ -404,7 +437,7 @@ public class HCAP extends AbstractProcessor {
     }
   }
 
-  private QueryComponents getQueryString(List<? extends VariableElement> parameters) {
+  private QueryComponents getQueryComponents(List<? extends VariableElement> parameters) {
     // TODO: complete
     final Function<VariableElement, String> queryNameExtractor =
         ve -> ve.getAnnotation(QueryParam.class).name();
@@ -440,7 +473,8 @@ public class HCAP extends AbstractProcessor {
               .formatted(paramName, paramArgName));
     }
 
-    final String required = queryParamStrJoiner.length() > 0 ? queryParamStrJoiner.toString() : "\"\"";
+    final String required =
+        queryParamStrJoiner.length() > 0 ? queryParamStrJoiner.toString() : "\"\"";
 
     final var optionalQpSb = new StringBuilder();
     for (var optionalParam : queryParamToArgNameByRequired.get(false).entrySet()) {
@@ -448,16 +482,16 @@ public class HCAP extends AbstractProcessor {
       final var paramArgName = optionalParam.getValue();
 
       optionalQpSb.append(
-        """
-        optionalQueryParams.put("%s", %s);\
-        """.formatted(paramName, paramArgName)
-      );
+          """
+          optionalQueryParams.put("%s", %s);\
+          """
+              .formatted(paramName, paramArgName));
     }
 
     return new QueryComponents(required, optionalQpSb.toString());
   }
 
-  private String getHeadersString(List<? extends VariableElement> parameters) {
+  private HeaderComponents getHeaderComponents(List<? extends VariableElement> parameters) {
     final Function<VariableElement, String> headerNameExtractor =
         ve -> ve.getAnnotation(Header.class).name();
     final Function<VariableElement, String> headerArgNameExtractor =
@@ -475,31 +509,37 @@ public class HCAP extends AbstractProcessor {
                         headerArgNameExtractor))); // TODO: add support for multiple headers with
     // the same name
 
-    final var headersStrJoiner = new StringJoiner(",");
+    final var requiredSb = new StringBuilder();
+    final var optionalSb = new StringBuilder();
+
+    // Map<String, Object> requiredHeadersMap = new HashMap<>();
+    // Map<String, Object> optionalHeadersMap = new HashMap<>();
 
     for (var requiredHeader : headersToArgNameByRequired.get(true).entrySet()) {
       final var headerName = requiredHeader.getKey();
       final var headerArgName = requiredHeader.getValue();
 
-      headersStrJoiner.add(
-          """
-          "%s", "%%s".formatted(Optional.ofNullable(%s).orElseThrow(IllegalArgumentException::new))\
-          """
-              .formatted(headerName, headerArgName));
+      requiredSb.append(
+        """
+        requiredHeadersMap.put("%s", %s);\
+        """.formatted(headerName, headerArgName)
+      );
     }
 
     for (var optionalHeader : headersToArgNameByRequired.get(false).entrySet()) {
       final var headerName = optionalHeader.getKey();
       final var headerArgName = optionalHeader.getValue();
 
-      headersStrJoiner.add(
-          """
-          "%s", "%%s".formatted(%s)\
-          """
-              .formatted(headerName, headerArgName));
+      optionalSb.append(
+        """
+        optionalHeadersMap.put("%s", %s);\
+        """.formatted(headerName, headerArgName)
+      );
+
     }
 
-    return headersStrJoiner.toString();
+    // return headersStrJoiner.toString();
+    return new HeaderComponents(requiredSb.toString(), optionalSb.toString());
   }
 
   private String getPathResolver(
@@ -577,7 +617,6 @@ public class HCAP extends AbstractProcessor {
   }
 }
 
-record QueryComponents(
-  String requiredQpStr,
-  String optionalMapPopulationStr
-) {}
+record QueryComponents(String requiredQpStr, String optionalQpMapPopulationStr) {}
+
+record HeaderComponents(String requiredHeadersMapPopulationStr, String optionalHeadersMapPopulationStr) {}
