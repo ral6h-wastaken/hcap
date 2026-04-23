@@ -425,7 +425,6 @@ The following features are documented in the source as incomplete or not yet imp
 - **`@Client.async` is unsupported.** Setting `async = true` will cause a compilation failure. Async support is planned for a future version.
 - **Duplicate query params names.** Setting two query params with the same name will cause compilation to fail (noted as `// TODO: add support for multiple query params with the same name`).
 - **Duplicate header names.** Setting two headers with the same name will cause compilation to fail (noted as `// TODO: add support for multiple headers with the same name`).
-- **HTTP/1.1 only.** The generated client always uses `Version.HTTP_1_1`.
 - **Blocking I/O only.** All requests are sent synchronously via `HttpClient.send(...)`.
 
 ---
