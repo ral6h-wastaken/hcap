@@ -198,12 +198,13 @@ public class HCAP extends AbstractProcessor {
           private final String host = "%s";
           private final int port = %d;
           private final String basePath = "%s";
+          private final Version version = Version.%s;
 
           public %s() {
             final var connectTimeout = %d;
 
             this.client = HttpClient.newBuilder()
-                  .version(Version.HTTP_1_1)
+                  .version(version)
                   .connectTimeout(Duration.ofSeconds(connectTimeout))
                   .executor(this.executor)
                   .build();
@@ -220,6 +221,7 @@ public class HCAP extends AbstractProcessor {
                 clientAnnotation.host(),
                 port,
                 clientAnnotation.basePath(),
+                clientAnnotation.version(),
                 elem.getSimpleName().toString() + "Impl",
                 clientAnnotation.connectTimeout()));
   }

@@ -1,5 +1,7 @@
 package com.ral6h.demo;
 
+import java.net.http.HttpClient.Version;
+
 import com.ral6h.hcap.annotation.Body;
 import com.ral6h.hcap.annotation.Client;
 import com.ral6h.hcap.annotation.Header;
@@ -14,8 +16,8 @@ public class App {
   public static void main(String[] args) throws Exception {
     try (final var clientImpl = new DummyClientImpl()) {
       // System.out.println(clientImpl.testGet());
-      System.out.println(clientImpl.testPostWithHeaders("testBody", "valueh1", null));
-      // System.out.println(clientImpl.testPostWithParams("testBody", "id1", "id2"));
+      // System.out.println(clientImpl.testPostWithHeaders("testBody", "valueh1", null));
+      System.out.println(clientImpl.testPostWithParams("testBody", "id1", "id2", "gigio", "value"));
       // System.out.println(clientImpl.testPutWithQueryParams("username", null));
       // System.out.println(clientImpl.testPutWithQueryParams("username", 12));
       // System.out.println(clientImpl.testPutWithQueryParams(null, 12));
@@ -23,7 +25,7 @@ public class App {
   }
 }
 
-@Client(scheme = HttpScheme.HTTP, host = "postman-echo.com")
+@Client(scheme = HttpScheme.HTTPS, host = "postman-echo.com", version = Version.HTTP_2)
 interface DummyClient {
   @Request(endpoint = "/get")
   public ClientResponse testGet();
@@ -37,7 +39,9 @@ interface DummyClient {
   public ClientResponse testPostWithParams(
       @Body String pippo,
       @PathParam(name = "testParam1") String arg1,
-      @PathParam(name = "testParam2") String arg2
+      @PathParam(name = "testParam2") String arg2,
+      @QueryParam(name = "name") String name,
+      @QueryParam(required = false, name = "key") String key
   );
 
   @Request(endpoint = "/put", method = RequestMethod.PUT)

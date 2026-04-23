@@ -4,11 +4,14 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.net.http.HttpClient.Version;
 
 @Retention(value = RetentionPolicy.SOURCE)
 @Target(value = {ElementType.TYPE})
 public @interface Client {
   HttpScheme scheme() default HttpScheme.HTTP;
+
+  Version version() default Version.HTTP_1_1;
 
   String host();
 
