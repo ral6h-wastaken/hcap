@@ -132,6 +132,7 @@ Marks an interface as an HTTP client. The processor generates a `<InterfaceName>
 |---|---|---|---|
 | `host` | `String` | *(required)* | The target server hostname or IP address. |
 | `scheme` | `HttpScheme` | `HTTP` | The HTTP scheme to use. Either `HttpScheme.HTTP` or `HttpScheme.HTTPS`. |
+| `version` | `HttpClient.Version` | `Version.HTTP_1_1` | The HTTP version to use. |
 | `port` | `int` | `-1` | The server port. Defaults to `80` for HTTP and `443` for HTTPS when set to `-1`. |
 | `basePath` | `String` | `""` | A path prefix prepended to every request endpoint. |
 | `connectTimeout` | `long` | `30` | Connection timeout in seconds. |
@@ -143,7 +144,8 @@ Marks an interface as an HTTP client. The processor generates a `<InterfaceName>
     scheme = Client.HttpScheme.HTTPS,
     host = "api.example.com",
     basePath = "/api/v2",
-    connectTimeout = 15
+    connectTimeout = 15,
+    version = Version.HTTP_2
 )
 public interface ProductClient { ... }
 ```
