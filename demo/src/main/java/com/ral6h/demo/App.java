@@ -11,6 +11,7 @@ import com.ral6h.hcap.annotation.PathParam;
 import com.ral6h.hcap.annotation.QueryParam;
 import com.ral6h.hcap.annotation.Request;
 import com.ral6h.hcap.annotation.Request.RequestMethod;
+import com.ral6h.hcap.model.ClientConfig;
 import com.ral6h.hcap.model.ClientResponse;
 
 public class App {

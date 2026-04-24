@@ -42,7 +42,6 @@ import javax.tools.JavaFileObject;
 @SupportedSourceVersion(value = SourceVersion.RELEASE_21)
 @SupportedAnnotationTypes(value = {"com.ral6h.hcap.annotation.Client"})
 public class HCAP extends AbstractProcessor {
-
   private final Predicate<? super ExecutableElement> DEFAULT_METHODS_VALIDATOR =
       el -> el.isDefault();
 

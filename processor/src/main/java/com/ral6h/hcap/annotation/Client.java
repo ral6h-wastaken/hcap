@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 import java.net.http.HttpClient.Version;
 
 @Retention(value = RetentionPolicy.SOURCE)
-@Target(value = {ElementType.TYPE})
+@Target(value = { ElementType.TYPE })
 public @interface Client {
   HttpScheme scheme() default HttpScheme.HTTP;
 
@@ -22,7 +22,15 @@ public @interface Client {
   long connectTimeout() default 30l;
 
   /**
-   * should add support in the future, for now setting this to true will cause compilation to fail,
+   * if true, provide a constructor which accepts a {@link ClientConfig} configuration class
+   * all the other properties should be derived from its accessor methods
+   * if this is set tu true the other annotation shall be ignored
+   */ 
+   boolean classConfig() default false;
+
+   /**
+   * should add support in the future, for now setting this to true will cause
+   * compilation to fail,
    * sry :(
    */
   boolean async() default false; // TODO: add support in the future
