@@ -25,6 +25,7 @@ import com.ral6h.hcap.annotation.Client.HttpScheme;
  *     .basePath("/v1")
  *     .scheme(Client.HttpScheme.HTTPS)
  *     .version(HttpClient.Version.HTTP_2)
+ *     .port(8080)
  *     .connectTimeout(10L)
  *     .build();
  * }</pre>
@@ -35,6 +36,9 @@ import com.ral6h.hcap.annotation.Client.HttpScheme;
  * <li>{@code basePath} – {@code ""} (empty string)</li>
  * <li>{@code version} – {@link HttpClient.Version#HTTP_1_1}</li>
  * <li>{@code scheme} – {@link Client.HttpScheme#HTTP}</li>
+ * <li>{@code port}–
+ * {@code 80 if scheme = Client.HttpScheme#HTTP, 443 if Client.HttpScheme#HTTPS}
+ * </li>
  * <li>{@code connectTimeout}– {@code 30} seconds</li>
  * <li>{@code async} – {@code false}</li>
  * </ul>
@@ -47,8 +51,13 @@ public class ClientConfig {
   private final String basePath;
   private final HttpClient.Version version;
   private final Client.HttpScheme scheme;
+  private final int port;
   private final long connectTimeout;
   private final boolean async;
+
+  public int getPort() {
+    return port;
+  }
 
   public String getHost() {
     return host;
@@ -78,12 +87,13 @@ public class ClientConfig {
    * Private constructor — use {@link #builder()} to obtain a
    * {@link MissingHostBuilder}.
    */
-  private ClientConfig(String host, String basePath, Version version, HttpScheme scheme, long connectTimeout,
+  private ClientConfig(String host, String basePath, Version version, HttpScheme scheme, int port, long connectTimeout,
       boolean async) {
     this.host = host;
     this.basePath = basePath;
     this.version = version;
     this.scheme = scheme;
+    this.port = port;
     this.connectTimeout = connectTimeout;
     this.async = async;
   }
@@ -140,7 +150,9 @@ public class ClientConfig {
       private String _basePath = "";
       private HttpClient.Version _version = Version.HTTP_1_1;
       private Client.HttpScheme _scheme = HttpScheme.HTTP;
-      private long _connectTimeout = 30l;
+      private int _port = 80;
+      private boolean _portSet = false;
+      private long _connectTimeout = 30_000l;
       private boolean _async = false;
 
       private Builder(String host) {
@@ -157,8 +169,17 @@ public class ClientConfig {
         return this;
       }
 
+      public Builder port(int port) {
+        this._port = port;
+        this._portSet = true;
+        return this;
+      }
+
       public Builder scheme(HttpScheme scheme) {
         this._scheme = scheme;
+        if (!this._portSet && HttpScheme.HTTPS.equals(scheme))
+          this._port = 443;
+
         return this;
       }
 
@@ -168,7 +189,7 @@ public class ClientConfig {
       }
 
       public ClientConfig build() {
-        return new ClientConfig(_host, _basePath, _version, _scheme, _connectTimeout, _async);
+        return new ClientConfig(_host, _basePath, _version, _scheme, _port, _connectTimeout, _async);
       }
     }
   }

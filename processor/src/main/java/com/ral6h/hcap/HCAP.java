@@ -4,6 +4,7 @@ import com.google.auto.service.AutoService;
 import com.google.common.net.HttpHeaders;
 import com.ral6h.hcap.annotation.Body;
 import com.ral6h.hcap.annotation.Client;
+import com.ral6h.hcap.annotation.Client.HttpScheme;
 import com.ral6h.hcap.annotation.Header;
 import com.ral6h.hcap.annotation.PathParam;
 import com.ral6h.hcap.annotation.QueryParam;
@@ -143,6 +144,8 @@ public class HCAP extends AbstractProcessor {
         import java.util.concurrent.ExecutorService;
 
         import com.ral6h.hcap.model.ClientResponse;
+        import com.ral6h.hcap.model.ClientConfig;
+
         import java.io.IOException;
         import java.net.URI;
         import java.net.URISyntaxException;
@@ -178,6 +181,27 @@ public class HCAP extends AbstractProcessor {
   private void printConstructorAndCloseMethod(
       PrintWriter fpw, Client clientAnnotation, TypeElement elem) {
 
+    fpw.println(
+        """
+          private final HttpClient client;
+          private final ExecutorService executor = Executors.newWorkStealingPool();
+
+          private final String scheme;
+          private final String host;
+          private final int port;
+          private final String basePath;
+          private final Version version;
+        """);
+
+    if (clientAnnotation.classConfig()) {
+        printConfigConstructor(fpw, clientAnnotation, elem);
+    } else {
+        printNoArgConstructor(fpw, clientAnnotation, elem);
+    }
+  }
+
+  private void printNoArgConstructor(PrintWriter fpw, Client clientAnnotation, TypeElement elem) {
+
     final var scheme = clientAnnotation.scheme();
     final int port =
         Optional.ofNullable(clientAnnotation.port())
@@ -189,23 +213,19 @@ public class HCAP extends AbstractProcessor {
                       case HTTPS -> 443;
                     });
 
-    fpw.println(
-        """
-          private final HttpClient client;
-          private final ExecutorService executor = Executors.newWorkStealingPool();
+    fpw.println("""
+            public %s() {
+            this.scheme = "%s";
+            this.host = "%s";
+            this.port = %d;
+            this.basePath = "%s";
+            this.version = Version.%s;
 
-          private final String scheme = "%s";
-          private final String host = "%s";
-          private final int port = %d;
-          private final String basePath = "%s";
-          private final Version version = Version.%s;
-
-          public %s() {
             final var connectTimeout = %d;
 
             this.client = HttpClient.newBuilder()
                   .version(version)
-                  .connectTimeout(Duration.ofSeconds(connectTimeout))
+                  .connectTimeout(Duration.ofMillis(connectTimeout))
                   .executor(this.executor)
                   .build();
           }
@@ -217,13 +237,41 @@ public class HCAP extends AbstractProcessor {
           }
         """
             .formatted(
+                elem.getSimpleName().toString() + "Impl",
                 scheme,
                 clientAnnotation.host(),
                 port,
                 clientAnnotation.basePath(),
                 clientAnnotation.version(),
-                elem.getSimpleName().toString() + "Impl",
                 clientAnnotation.connectTimeout()));
+  }
+
+  private void printConfigConstructor(PrintWriter fpw, Client clientAnnotation, TypeElement elem) {
+
+    fpw.println("""
+          public %s(ClientConfig config) {
+            this.scheme = config.getScheme().toString();
+            this.host = config.getHost();
+            this.port = config.getPort();
+            this.basePath = config.getBasePath();
+            this.version = config.getVersion();
+
+            final var connectTimeout = config.getConnectTimeout();
+
+            this.client = HttpClient.newBuilder()
+                  .version(version)
+                  .connectTimeout(Duration.ofMillis(connectTimeout))
+                  .executor(this.executor)
+                  .build();
+          }
+
+          @Override
+          public void close() {
+            this.executor.close();  //is this necessary? maybe the close method in the http client already does it?? check the source code
+            this.client.close();
+          }
+        """
+            .formatted(elem.getSimpleName().toString() + "Impl"));
   }
 
   private void printImplementedMethods(PrintWriter fpw, TypeElement clientAnnotationElem) {
@@ -374,7 +422,7 @@ public class HCAP extends AbstractProcessor {
             final var requestBuilder =
                 HttpRequest.newBuilder(uri)
                     .%s
-                    .timeout(Duration.ofSeconds(readTimeout));
+                    .timeout(Duration.ofMillis(readTimeout));
 
             if (headers.length > 0) requestBuilder.headers(headers);
 

@@ -13,13 +13,13 @@ public @interface Client {
 
   Version version() default Version.HTTP_1_1;
 
-  String host();
+  String host() default "";
 
   int port() default -1;
 
   String basePath() default "";
 
-  long connectTimeout() default 30l;
+  long connectTimeout() default 30_000l;
 
   /**
    * if true, provide a constructor which accepts a {@link ClientConfig} configuration class

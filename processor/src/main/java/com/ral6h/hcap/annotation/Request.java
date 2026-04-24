@@ -13,7 +13,7 @@ public @interface Request {
 
   String endpoint() default "";
 
-  long readTimeout() default 30l;
+  long readTimeout() default 30_000l;
 
   public enum RequestMethod {
     DELETE,
