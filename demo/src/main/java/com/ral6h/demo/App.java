@@ -24,9 +24,6 @@ public class App {
       .connectTimeout(10_000l)
       .build();
 
-new GreetingClientImpl() {
-  
-};
     try (final DummyClient clientImpl = new DummyClientImpl(config)) {
       // System.out.println(clientImpl.testGet());
       System.out.println(clientImpl.testPostWithHeaders("{'pippo': 12}", "valueh1", null));
@@ -64,7 +61,7 @@ interface DummyClient extends AutoCloseable {
   );
 }
 
-@Client(host = "localhost", port = 8080, basePath = "/api")
+@Client(classConfig = true)
 interface GreetingClient {
     @Request(endpoint = "/hello/{name}", readTimeout = 5_000)
     ClientResponse greet(@PathParam(name = "name") String name);

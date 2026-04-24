@@ -313,7 +313,7 @@ The processor generates a class like the following (simplified):
 
 ```java
 @Generated(value = "com.ral6h.hcap.ClientGenProcessor", date = "...")
-public final class GreetingClientImpl implements GreetingClient, AutoCloseable{
+public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
   private final HttpClient client;
   private final ExecutorService executor = Executors.newWorkStealingPool();
 
@@ -346,8 +346,7 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable{
   }
 
   @Override
-  public com.ral6h.hcap.model.ClientResponse greet(java.lang.String name) 
-{
+  public com.ral6h.hcap.model.ClientResponse greet(java.lang.String name) {
     String path = "/api/hello/%s".formatted(name);
     String query = "";
     Map<String, Object> optionalQueryParams = new HashMap<>();
@@ -421,7 +420,128 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable{
       Thread.currentThread().interrupt();
       return null;
     }
+  }
 }
+```
+
+If we instead specify 
+
+```java
+@Client(classConfig = true)
+```
+
+then the generated implementation will look like this: 
+
+```java
+@Generated(value = "com.ral6h.hcap.ClientGenProcessor", date = "...")
+public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
+  private final HttpClient client;
+  private final ExecutorService executor = Executors.newWorkStealingPool();
+
+  private final String scheme;
+  private final String host;
+  private final int port;
+  private final String basePath;
+  private final Version version;
+
+  public GreetingClientImpl(ClientConfig config) {
+    this.scheme = config.getScheme().toString();
+    this.host = config.getHost();
+    this.port = config.getPort();
+    this.basePath = config.getBasePath();
+    this.version = config.getVersion();
+
+    final var connectTimeout = config.getConnectTimeout();
+
+    this.client = HttpClient.newBuilder()
+          .version(version)
+          .connectTimeout(Duration.ofMillis(connectTimeout))
+          .executor(this.executor)
+          .build();
+  }
+
+  @Override
+  public void close() {
+    this.executor.close();  //is this necessary? maybe the close method in the http client already does it?? check the source code
+    this.client.close();
+  }
+
+  @Override
+  public com.ral6h.hcap.model.ClientResponse greet(java.lang.String name) {
+    String path = "/hello/%s".formatted(name);
+    String query = "";
+    Map<String, Object> optionalQueryParams = new HashMap<>();
+
+    //optional qp map population
+    
+
+    for (final var entry : optionalQueryParams.entrySet()) {
+      if (entry.getValue() != null) {
+        query += "&%s=%s".formatted(entry.getKey(), entry.getValue());
+      }
+    }
+
+    List<String> headersList = new ArrayList<>();
+    Map<String, Object> requiredHeadersMap = new HashMap<>();
+    Map<String, Object> optionalHeadersMap = new HashMap<>();
+
+    //required headers map population
+    
+    //optional headers map population
+    optionalHeadersMap.put("Content-Type", null);
+
+    for (final var requiredHeader : requiredHeadersMap.entrySet()) {
+      headersList.add(requiredHeader.getKey());
+      headersList.add(
+        Optional.ofNullable(requiredHeader.getValue())
+          .map(Object::toString)
+          .orElseThrow(IllegalArgumentException::new)
+      );
+    }
+
+    for (final var optionalHeader : optionalHeadersMap.entrySet()) {
+      if (optionalHeader.getValue() != null) {
+        headersList.add(optionalHeader.getKey());
+        headersList.add(optionalHeader.getValue().toString());
+      }
+    }
+
+    String[] headers = headersList.toArray(new String[] {});
+    int readTimeout = 5000;
+
+    URI uri;
+    try {
+      uri = new URI(this.scheme, null, this.host, this.port, path, query, null);
+    } catch (URISyntaxException e) {
+      System.out.println("Invalid URI: " + e.toString());
+      return new ClientResponse(500, Map.of(), Optional.empty());
+    }
+
+    final var requestBuilder =
+        HttpRequest.newBuilder(uri)
+            .GET()
+            .timeout(Duration.ofMillis(readTimeout));
+
+    if (headers.length > 0) requestBuilder.headers(headers);
+
+    final var request = requestBuilder.build();
+
+    try {
+      System.out.println(request);
+      final var httpResponse = client.send(request, BodyHandlers.ofString());
+
+      return new ClientResponse(
+          httpResponse.statusCode(),
+          httpResponse.headers().map(),
+          Optional.ofNullable(httpResponse.body()));
+
+    } catch (IOException e1) {
+      return new ClientResponse(500, Map.of(), Optional.empty());
+    } catch (InterruptedException e1) {
+      Thread.currentThread().interrupt();
+      return null;
+    }
+  }
 }
 ```
 
