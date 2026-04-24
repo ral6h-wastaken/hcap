@@ -2,6 +2,7 @@ package com.ral6h.demo;
 
 import java.net.http.HttpHeaders;
 import java.net.http.HttpClient.Version;
+import java.time.Duration;
 
 import com.ral6h.hcap.annotation.Body;
 import com.ral6h.hcap.annotation.Client;
@@ -16,7 +17,14 @@ import com.ral6h.hcap.model.ClientResponse;
 
 public class App {
   public static void main(String[] args) throws Exception {
-    try (final DummyClient clientImpl = new DummyClientImpl()) {
+
+    final var config = ClientConfig.builder()
+      .host( "postman-echo.com")
+      .version(Version.HTTP_2)
+      .connectTimeout(10_000l)
+      .build();
+
+    try (final DummyClient clientImpl = new DummyClientImpl(config)) {
       // System.out.println(clientImpl.testGet());
       System.out.println(clientImpl.testPostWithHeaders("{'pippo': 12}", "valueh1", null));
       // System.out.println(clientImpl.testPostWithParams("{'pippo': 12}", "id1", "id2", "gigio", "value"));
@@ -27,7 +35,7 @@ public class App {
   }
 }
 
-@Client(scheme = HttpScheme.HTTPS, host = "postman-echo.com", version = Version.HTTP_2)
+@Client(classConfig = true)
 interface DummyClient extends AutoCloseable {
   @Request(endpoint = "/get")
   public ClientResponse testGet();

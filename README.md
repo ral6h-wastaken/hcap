@@ -17,6 +17,7 @@
   - [@QueryParam](#queryparam)
   - [@Header](#header)
   - [@Body](#body)
+- [ClientConfig](#clientconfig)
 - [ClientResponse](#clientresponse)
 - [Generated Code](#generated-code)
 - [Validation Rules](#validation-rules)
@@ -80,17 +81,17 @@ import com.ral6h.hcap.model.ClientResponse;
     host = "api.example.com",
     port = 443,
     basePath = "/v1",
-    connectTimeout = 10
+    connectTimeout = 10_000
 )
 public interface UserClient {
 
-    @Request(method = Request.RequestMethod.GET, endpoint = "/users/{userId}", readTimeout = 5)
+    @Request(method = Request.RequestMethod.GET, endpoint = "/users/{userId}", readTimeout = 5_000)
     ClientResponse getUser(
         @PathParam(name = "userId") String userId,
         @Header(name = "Authorization", required = true) String authHeader
     );
 
-    @Request(method = Request.RequestMethod.POST, endpoint = "/users", readTimeout = 10)
+    @Request(method = Request.RequestMethod.POST, endpoint = "/users", readTimeout = 10_000)
     ClientResponse createUser(
         @Header(name = "Content-Type", required = true) String contentType,
         @Body(contentType = "application/json") String body
@@ -130,13 +131,14 @@ Marks an interface as an HTTP client. The processor generates a `<InterfaceName>
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `host` | `String` | *(required)* | The target server hostname or IP address. |
+| `host` | `String` | `""` | The target server hostname or IP address. |
 | `scheme` | `HttpScheme` | `HTTP` | The HTTP scheme to use. Either `HttpScheme.HTTP` or `HttpScheme.HTTPS`. |
 | `version` | `HttpClient.Version` | `Version.HTTP_1_1` | The HTTP version to use. |
 | `port` | `int` | `-1` | The server port. Defaults to `80` for HTTP and `443` for HTTPS when set to `-1`. |
 | `basePath` | `String` | `""` | A path prefix prepended to every request endpoint. |
-| `connectTimeout` | `long` | `30` | Connection timeout in seconds. |
+| `connectTimeout` | `long` | `30_000` | Connection timeout in milliseconds. |
 | `async` | `boolean` | `false` | ⚠️ Not yet supported. Setting this to `true` will cause compilation to fail. |
+| `classConfig` | `boolean` | `false` | If set to true, all the other parameters will be ignored and a constructor taking a [ClientConfig](#clientconfig) object as a parameter will be generated |
 
 **Example:**
 ```java
@@ -144,7 +146,7 @@ Marks an interface as an HTTP client. The processor generates a `<InterfaceName>
     scheme = Client.HttpScheme.HTTPS,
     host = "api.example.com",
     basePath = "/api/v2",
-    connectTimeout = 15,
+    connectTimeout = 15_000,
     version = Version.HTTP_2
 )
 public interface ProductClient { ... }
@@ -163,11 +165,11 @@ Marks an interface method as an HTTP request. Every annotated method must be `pu
 |---|---|---|---|
 | `method` | `RequestMethod` | `GET` | The HTTP method. One of `GET`, `POST`, `PUT`, `DELETE`, `HEAD`. |
 | `endpoint` | `String` | `""` | The path relative to `@Client.basePath`. Supports `{paramName}` placeholders for path parameters. |
-| `readTimeout` | `long` | `30` | Per-request read timeout in seconds. |
+| `readTimeout` | `long` | `30_000` | Per-request read timeout in milliseconds. |
 
 **Example:**
 ```java
-@Request(method = Request.RequestMethod.PUT, endpoint = "/products/{id}", readTimeout = 20)
+@Request(method = Request.RequestMethod.PUT, endpoint = "/products/{id}", readTimeout = 20_000)
 ClientResponse updateProduct(
     @PathParam(name = "id") String id,
     @Body String body
@@ -258,6 +260,14 @@ For methods that do not have a `@Body` parameter, the processor automatically us
 
 ---
 
+## ClientConfig
+
+A convenience class, which exposes all the configurations parameters present in [@Client](#client).
+Particularly useful when these configurations need to be parametrized.
+---
+
+---
+
 ## ClientResponse
 
 All `@Request` methods must return `com.ral6h.hcap.model.ClientResponse`, a Java record that wraps the HTTP response.
@@ -293,7 +303,7 @@ Given the interface:
 ```java
 @Client(host = "localhost", port = 8080, basePath = "/api")
 public interface GreetingClient {
-    @Request(endpoint = "/hello/{name}", readTimeout = 5)
+    @Request(endpoint = "/hello/{name}", readTimeout = 5_000)
     ClientResponse greet(@PathParam(name = "name") String name);
 }
 ```
@@ -315,7 +325,7 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
     public GreetingClientImpl() {
         this.client = HttpClient.newBuilder()
             .version(Version.HTTP_1_1)
-            .connectTimeout(Duration.ofSeconds(30))
+            .connectTimeout(Duration.ofMillis(30))
             .executor(this.executor)
             .build();
     }
@@ -366,7 +376,7 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
         }
 
         String[] headers = headersList.toArray(new String[] {});
-        int readTimeout = 5;
+        int readTimeout = 5_000;
 
         URI uri;
         try {
@@ -377,7 +387,7 @@ public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
 
         final var requestBuilder = HttpRequest.newBuilder(uri)
             .GET()
-            .timeout(Duration.ofSeconds(readTimeout));
+            .timeout(Duration.ofMillis(readTimeout));
 
         if (headers.length > 0) requestBuilder.headers(headers);
 
