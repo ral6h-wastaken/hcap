@@ -264,6 +264,7 @@ For methods that do not have a `@Body` parameter, the processor automatically us
 
 A convenience class, which exposes all the configurations parameters present in [@Client](#client).
 Particularly useful when these configurations need to be parametrized.
+
 ---
 
 ---
