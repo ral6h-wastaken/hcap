@@ -312,102 +312,116 @@ public interface GreetingClient {
 The processor generates a class like the following (simplified):
 
 ```java
-@Generated(value = "com.ral6h.hcap.hcapProcessor", date = "...")
-public final class GreetingClientImpl implements GreetingClient, AutoCloseable {
+@Generated(value = "com.ral6h.hcap.ClientGenProcessor", date = "...")
+public final class GreetingClientImpl implements GreetingClient, AutoCloseable{
+  private final HttpClient client;
+  private final ExecutorService executor = Executors.newWorkStealingPool();
 
-    private final HttpClient client;
-    private final ExecutorService executor = Executors.newWorkStealingPool();
-
-    private final String scheme = "http";
-    private final String host   = "localhost";
-    private final int    port   = 8080;
-    private final String basePath = "/api";
+  private final String scheme;
+  private final String host;
+  private final int port;
+  private final String basePath;
+  private final Version version;
 
     public GreetingClientImpl() {
-        this.client = HttpClient.newBuilder()
-            .version(Version.HTTP_1_1)
-            .connectTimeout(Duration.ofMillis(30))
-            .executor(this.executor)
-            .build();
+    this.scheme = "http";
+    this.host = "localhost";
+    this.port = 8080;
+    this.basePath = "/api";
+    this.version = Version.HTTP_1_1;
+
+    final var connectTimeout = 30000;
+
+    this.client = HttpClient.newBuilder()
+          .version(version)
+          .connectTimeout(Duration.ofMillis(connectTimeout))
+          .executor(this.executor)
+          .build();
+  }
+
+  @Override
+  public void close() {
+    this.executor.close();
+    this.client.close();
+  }
+
+  @Override
+  public com.ral6h.hcap.model.ClientResponse greet(java.lang.String name) 
+{
+    String path = "/api/hello/%s".formatted(name);
+    String query = "";
+    Map<String, Object> optionalQueryParams = new HashMap<>();
+
+    //optional qp map population
+    
+
+    for (final var entry : optionalQueryParams.entrySet()) {
+      if (entry.getValue() != null) {
+        query += "&%s=%s".formatted(entry.getKey(), entry.getValue());
+      }
     }
 
-    @Override
-    public void close() {
-        this.executor.close();
-        this.client.close();
+    List<String> headersList = new ArrayList<>();
+    Map<String, Object> requiredHeadersMap = new HashMap<>();
+    Map<String, Object> optionalHeadersMap = new HashMap<>();
+
+    //required headers map population
+    
+    //optional headers map population
+    optionalHeadersMap.put("Content-Type", null);
+
+    for (final var requiredHeader : requiredHeadersMap.entrySet()) {
+      headersList.add(requiredHeader.getKey());
+      headersList.add(
+        Optional.ofNullable(requiredHeader.getValue())
+          .map(Object::toString)
+          .orElseThrow(IllegalArgumentException::new)
+      );
     }
 
-    @Override
-    public ClientResponse greet(String name) {
-        String path  = "/api/hello/%s".formatted(name);
-        String query = "";
-        Map<String, Object> optionalQueryParams = new HashMap<>();
+    for (final var optionalHeader : optionalHeadersMap.entrySet()) {
+      if (optionalHeader.getValue() != null) {
+        headersList.add(optionalHeader.getKey());
+        headersList.add(optionalHeader.getValue().toString());
+      }
+    }
 
-        //optional qp map population
+    String[] headers = headersList.toArray(new String[] {});
+    int readTimeout = 5000;
 
-        for (final var entry : optionalQueryParams.entrySet()) {
-          if (entry.getValue() != null) {
-            query += "&%s=%s".formatted(entry.getKey(), entry.getValue());
-          }
-        }
+    URI uri;
+    try {
+      uri = new URI(this.scheme, null, this.host, this.port, path, query, null);
+    } catch (URISyntaxException e) {
+      System.out.println("Invalid URI: " + e.toString());
+      return new ClientResponse(500, Map.of(), Optional.empty());
+    }
 
-        List<String> headersList = new ArrayList<>();
-        Map<String, Object> requiredHeadersMap = new HashMap<>();
-        Map<String, Object> optionalHeadersMap = new HashMap<>();
-
-        //required headers map population
-        
-        //optional headers map population
-        
-
-        for (final var requiredHeader : requiredHeadersMap.entrySet()) {
-          headersList.add(requiredHeader.getKey());
-          headersList.add(
-            Optional.ofNullable(requiredHeader.getValue())
-              .map(Object::toString)
-              .orElseThrow(IllegalArgumentException::new)
-          );
-        }
-
-        for (final var optionalHeader : optionalHeadersMap.entrySet()) {
-          if (optionalHeader.getValue() != null) {
-            headersList.add(optionalHeader.getKey());
-            headersList.add(optionalHeader.getValue().toString());
-          }
-        }
-
-        String[] headers = headersList.toArray(new String[] {});
-        int readTimeout = 5_000;
-
-        URI uri;
-        try {
-            uri = new URI(this.scheme, null, this.host, this.port, path, query, null);
-        } catch (URISyntaxException e) {
-            return new ClientResponse(500, Map.of(), Optional.empty());
-        }
-
-        final var requestBuilder = HttpRequest.newBuilder(uri)
+    final var requestBuilder =
+        HttpRequest.newBuilder(uri)
             .GET()
             .timeout(Duration.ofMillis(readTimeout));
 
-        if (headers.length > 0) requestBuilder.headers(headers);
+    if (headers.length > 0) requestBuilder.headers(headers);
 
-        final var request = requestBuilder.build();
+    final var request = requestBuilder.build();
 
-        try {
-            final var httpResponse = client.send(request, BodyHandlers.ofString());
-            return new ClientResponse(
-                httpResponse.statusCode(),
-                httpResponse.headers().map(),
-                Optional.ofNullable(httpResponse.body())
-            );
-        } catch (IOException e1) {
-            return new ClientResponse(500, Map.of(), Optional.empty());
-        } catch (InterruptedException e1) {
-            Thread.currentThread().interrupt();
-            return null;
-        }
+    try {
+      System.out.println(request);
+      final var httpResponse = client.send(request, BodyHandlers.ofString());
+
+      return new ClientResponse(
+          httpResponse.statusCode(),
+          httpResponse.headers().map(),
+          Optional.ofNullable(httpResponse.body()));
+
+    } catch (IOException e1) {
+      return new ClientResponse(500, Map.of(), Optional.empty());
+    } catch (InterruptedException e1) {
+      Thread.currentThread().interrupt();
+      return null;
     }
+}
 }
 ```
 
