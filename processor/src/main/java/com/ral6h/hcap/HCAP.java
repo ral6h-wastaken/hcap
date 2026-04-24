@@ -1,6 +1,7 @@
 package com.ral6h.hcap;
 
 import com.google.auto.service.AutoService;
+import com.google.common.net.HttpHeaders;
 import com.ral6h.hcap.annotation.Body;
 import com.ral6h.hcap.annotation.Client;
 import com.ral6h.hcap.annotation.Header;
@@ -231,6 +232,9 @@ public class HCAP extends AbstractProcessor {
 
     final var clientAnnotation = clientAnnotationElem.getAnnotation(Client.class);
 
+    // TODO: here we could, in the future, group by different annotations (e.g. if
+    // we want to add support for custom req/res body publishers via default
+    // methods)
     final var declaredMethods =
         clientAnnotationElem.getEnclosedElements().stream()
             .filter(elem -> elem.getKind() == ElementKind.METHOD)
@@ -315,7 +319,7 @@ public class HCAP extends AbstractProcessor {
     String path = getPathResolver(clientMethod, clientAnnotation, requestAnnotation);
 
     QueryComponents queryComponents = getQueryComponents(clientMethod.getParameters());
-    HeaderComponents headerComponents = getHeaderComponents(clientMethod.getParameters());
+    HeaderComponents headerComponents = getHeaderComponents(clientMethod);
 
     fpw.print(
         """
@@ -406,9 +410,7 @@ public class HCAP extends AbstractProcessor {
   private String getBodyPublisherStr(ExecutableElement clientMethod) {
 
     final List<? extends VariableElement> bodyElements =
-        clientMethod.getParameters().stream()
-            .filter(param -> param.getAnnotation(Body.class) != null)
-            .toList();
+        getBodyElements(clientMethod);
 
     return switch (bodyElements.size()) {
       case 0 -> "BodyPublishers.noBody()";
@@ -424,6 +426,12 @@ public class HCAP extends AbstractProcessor {
         yield null;
       }
     };
+  }
+
+  private List<? extends VariableElement> getBodyElements(ExecutableElement clientMethod) {
+    return clientMethod.getParameters().stream()
+        .filter(param -> param.getAnnotation(Body.class) != null)
+        .toList();
   }
 
   private void validateBodyParam(VariableElement bodyElem) {
@@ -492,16 +500,21 @@ public class HCAP extends AbstractProcessor {
     return new QueryComponents(required, optionalQpSb.toString());
   }
 
-  private HeaderComponents getHeaderComponents(List<? extends VariableElement> parameters) {
+  private HeaderComponents getHeaderComponents(ExecutableElement clientMethod) {
+    final List<? extends VariableElement> parameters = clientMethod.getParameters();
+
     final Function<VariableElement, String> headerNameExtractor =
         ve -> ve.getAnnotation(Header.class).name();
     final Function<VariableElement, String> headerArgNameExtractor =
         ve -> ve.getSimpleName().toString();
 
-    final Map<Boolean, Map<String, String>> headersToArgNameByRequired =
+    final List<VariableElement> headerParams = 
         parameters.stream()
             .filter(elem -> elem.getAnnotation(Header.class) != null)
             .map(elem -> (VariableElement) elem)
+            .toList();
+
+    final Map<Boolean, Map<String, String>> headersToArgNameByRequired = headerParams.stream()
             .collect(
                 Collectors.partitioningBy(
                     ve -> ve.getAnnotation(Header.class).required(),
@@ -509,6 +522,37 @@ public class HCAP extends AbstractProcessor {
                         headerNameExtractor,
                         headerArgNameExtractor))); // TODO: add support for multiple headers with
     // the same name
+
+    final List<? extends VariableElement> bodyElements = getBodyElements(clientMethod);
+    final String contentType = switch (bodyElements.size()) {
+      case 0 -> null;
+      case 1 -> {
+        final var bodyElem = bodyElements.get(0);
+        validateBodyParam(bodyElem);
+        yield Optional.ofNullable(
+          bodyElem.getAnnotation(Body.class).contentType()
+        )
+        .map(raw -> String.format(
+           "\"%s\"", raw
+        ))
+        .orElseGet(() -> "\"text/plain\"");//should never happen but just in case we get the default anyway
+      }
+      default -> {
+        super.processingEnv //should never happen here but better safe than sorry
+            .getMessager()
+            .printError("At most 1 method parameter can be annotated with @Body", clientMethod);
+        yield null;
+      }
+    };
+
+    headerParams.stream().map(headerNameExtractor)
+      .filter(h -> HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(h))
+      .findAny()
+      .ifPresentOrElse(
+        h -> {/*only auto-generate header if not already present as a declared parameter*/}, 
+        //TODO: think about it, this looks like a sane default for now
+        () -> headersToArgNameByRequired.get(false).putIfAbsent(HttpHeaders.CONTENT_TYPE, contentType)
+      );
 
     final var requiredSb = new StringBuilder();
     final var optionalSb = new StringBuilder();

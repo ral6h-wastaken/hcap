@@ -243,7 +243,7 @@ Marks a method parameter as the HTTP request body. Only `String` parameters are 
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `contentType` | `String` | `"text/plain"` | The MIME type of the body. Informational only; the value is not currently used to set a `Content-Type` header automatically. |
+| `contentType` | `String` | `"text/plain"` | The MIME type of the body. Only used if there is no explicit method paramenter annotated with `@Header("Content-Type")` |
 | `required` | `boolean` | `true` | Whether the body is required. Informational only in the current implementation. |
 
 **Example:**
@@ -423,7 +423,6 @@ The processor enforces the following rules at **compile time** and emits a compi
 
 The following features are documented in the source as incomplete or not yet implemented:
 
-- **`@Body.contentType` is not used to set a header.** The content type declared on `@Body` is informational and does not automatically generate a `Content-Type` header.
 - **`@Client.async` is unsupported.** Setting `async = true` will cause a compilation failure. Async support is planned for a future version.
 - **Duplicate query params names.** Setting two query params with the same name will cause compilation to fail (noted as `// TODO: add support for multiple query params with the same name`).
 - **Duplicate header names.** Setting two headers with the same name will cause compilation to fail (noted as `// TODO: add support for multiple headers with the same name`).

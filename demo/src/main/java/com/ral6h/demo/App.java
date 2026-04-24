@@ -1,5 +1,6 @@
 package com.ral6h.demo;
 
+import java.net.http.HttpHeaders;
 import java.net.http.HttpClient.Version;
 
 import com.ral6h.hcap.annotation.Body;
@@ -14,10 +15,10 @@ import com.ral6h.hcap.model.ClientResponse;
 
 public class App {
   public static void main(String[] args) throws Exception {
-    try (final var clientImpl = new DummyClientImpl()) {
+    try (final DummyClient clientImpl = new DummyClientImpl()) {
       // System.out.println(clientImpl.testGet());
-      // System.out.println(clientImpl.testPostWithHeaders("testBody", "valueh1", null));
-      System.out.println(clientImpl.testPostWithParams("testBody", "id1", "id2", "gigio", "value"));
+      System.out.println(clientImpl.testPostWithHeaders("{'pippo': 12}", "valueh1", null));
+      // System.out.println(clientImpl.testPostWithParams("{'pippo': 12}", "id1", "id2", "gigio", "value"));
       // System.out.println(clientImpl.testPutWithQueryParams("username", null));
       // System.out.println(clientImpl.testPutWithQueryParams("username", 12));
       // System.out.println(clientImpl.testPutWithQueryParams(null, 12));
@@ -26,18 +27,18 @@ public class App {
 }
 
 @Client(scheme = HttpScheme.HTTPS, host = "postman-echo.com", version = Version.HTTP_2)
-interface DummyClient {
+interface DummyClient extends AutoCloseable {
   @Request(endpoint = "/get")
   public ClientResponse testGet();
 
   @Request(endpoint = "/post", method = RequestMethod.POST)
-  public ClientResponse testPostWithHeaders(@Body String pippo,
+  public ClientResponse testPostWithHeaders(@Body(contentType = "application/json") String pippo,
       @Header(name = "pippo") String pipppoHeader,
       @Header(name = "pippo2", required = false) String pipppoHeader2);
 
   @Request(endpoint = "/post/{testParam1}/fisso/{testParam2}", method = RequestMethod.POST)
   public ClientResponse testPostWithParams(
-      @Body String pippo,
+      @Body(contentType = "application/json") String pippo,
       @PathParam(name = "testParam1") String arg1,
       @PathParam(name = "testParam2") String arg2,
       @QueryParam(name = "name") String name,
